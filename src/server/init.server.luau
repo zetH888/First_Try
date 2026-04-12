@@ -1,1 +1,1 @@
-print("Hello world, from server!")
+print("Rojo Connection Test: SUCCESS!")

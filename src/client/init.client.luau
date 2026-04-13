@@ -16,6 +16,7 @@ local camera = Workspace.CurrentCamera
 local RADAR_RANGE = 100 -- Units
 local BASE_SIZE = 260 -- Previous size after 30% increase
 local RADAR_SIZE_PX = math.floor(BASE_SIZE * 1.15) -- Increased by exactly 15% (~300px)
+
 local SCALE = (RADAR_SIZE_PX / 2) / RADAR_RANGE -- Pixels per unit
 local UPDATE_INTERVAL_MS = 0.1 -- 100ms
 local LERP_SPEED = 10
@@ -31,33 +32,21 @@ screenGui.Parent = playerGui
 -- Main Container (Bottom Left)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "RadarContainer"
-mainFrame.Size = UDim2.new(0, RADAR_SIZE_PX + 40, 0, RADAR_SIZE_PX + 80)
+mainFrame.Size = UDim2.new(0, RADAR_SIZE_PX, 0, RADAR_SIZE_PX) -- Tight fit
 mainFrame.Position = UDim2.new(0, 20, 1, -20)
 mainFrame.AnchorPoint = Vector2.new(0, 1)
 mainFrame.BackgroundTransparency = 1
 mainFrame.Parent = screenGui
 
--- Coords Label (X, Z only)
-local coordsLabel = Instance.new("TextLabel")
-coordsLabel.Name = "CoordsLabel"
-coordsLabel.Size = UDim2.new(1, 0, 0, 30)
-coordsLabel.Position = UDim2.new(0, 10, 0, 0)
-coordsLabel.BackgroundTransparency = 1
-coordsLabel.TextColor3 = Color3.new(1, 1, 1)
-coordsLabel.TextSize = 20
-coordsLabel.Font = Enum.Font.RobotoMono
-coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
-coordsLabel.Text = "X: 0.0, Z: 0.0"
-coordsLabel.ZIndex = 10
-coordsLabel.Parent = mainFrame
+
 
 -- CanvasGroup is the KEY to perfect circular clipping in Roblox
 local radarCanvas = Instance.new("CanvasGroup")
 radarCanvas.Name = "RadarCanvas"
-radarCanvas.Size = UDim2.new(0, RADAR_SIZE_PX, 0, RADAR_SIZE_PX)
-radarCanvas.Position = UDim2.new(0, 10, 0, 40)
-radarCanvas.BackgroundColor3 = Color3.new(0, 0, 0) -- Pure black for darker background
-radarCanvas.BackgroundTransparency = 0.6 -- Slightly more opaque for darkening
+radarCanvas.Size = UDim2.new(1, 0, 1, 0) -- Fill mainFrame
+radarCanvas.Position = UDim2.new(0, 0, 0, 0) -- Reset position
+radarCanvas.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+radarCanvas.BackgroundTransparency = 0.3
 radarCanvas.BorderSizePixel = 0
 radarCanvas.GroupTransparency = 0
 radarCanvas.ClipsDescendants = true
@@ -67,60 +56,51 @@ local canvasCorner = Instance.new("UICorner")
 canvasCorner.CornerRadius = UDim.new(1, 0) -- Force perfect circle
 canvasCorner.Parent = radarCanvas
 
--- Grid Container (Inside CanvasGroup directly for better clipping)
-local gridContainer = Instance.new("Frame")
-gridContainer.Name = "GridContainer"
-gridContainer.Size = UDim2.new(1, 0, 1, 0)
-gridContainer.BackgroundTransparency = 1
-gridContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-gridContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-gridContainer.Parent = radarCanvas
+local aspectConstraint = Instance.new("UIAspectRatioConstraint")
+aspectConstraint.AspectRatio = 1
+aspectConstraint.Parent = radarCanvas
 
--- Draw Grid Lines (Every 10 units)
--- Optimized: Only draw lines within the range
-for i = -RADAR_RANGE, RADAR_RANGE, 10 do
-    -- Vertical
-    local vLine = Instance.new("Frame")
-    vLine.Size = UDim2.new(0, 1, 1, 0) -- Limited to 1 (100% height)
-    vLine.Position = UDim2.new(0.5, i * SCALE, 0.5, 0)
-    vLine.AnchorPoint = Vector2.new(0.5, 0.5)
-    vLine.BackgroundColor3 = Color3.new(1, 1, 1)
-    vLine.BackgroundTransparency = 0.94 -- Slightly more transparent grid
-    vLine.BorderSizePixel = 0
-    vLine.Parent = gridContainer
 
-    -- Horizontal
-    local hLine = Instance.new("Frame")
-    hLine.Size = UDim2.new(1, 0, 0, 1) -- Limited to 1 (100% width)
-    hLine.Position = UDim2.new(0.5, 0, 0.5, i * SCALE)
-    hLine.AnchorPoint = Vector2.new(0.5, 0.5)
-    hLine.BackgroundColor3 = Color3.new(1, 1, 1)
-    hLine.BackgroundTransparency = 0.94 -- Slightly more transparent grid
-    hLine.BorderSizePixel = 0
-    hLine.Parent = gridContainer
-end
+
+-- Coords Label (Moved INSIDE Radar)
+local coordsLabel = Instance.new("TextLabel")
+coordsLabel.Name = "CoordsLabel"
+coordsLabel.Size = UDim2.new(0, 200, 0, 20)
+coordsLabel.Position = UDim2.new(0.5, 0, 0.2, 0) -- Top part of the circle
+coordsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+coordsLabel.BackgroundTransparency = 1
+coordsLabel.TextColor3 = Color3.new(1, 1, 1)
+coordsLabel.TextStrokeTransparency = 0.5 -- Better readability
+coordsLabel.TextSize = 16
+coordsLabel.Font = Enum.Font.RobotoMono
+coordsLabel.Text = "X: 0.0, Z: 0.0"
+coordsLabel.ZIndex = 20 -- Above everything
+coordsLabel.Parent = radarCanvas -- Moved inside CanvasGroup
 
 -- Cardinal Markers Container (Rotates)
+-- Moved BACK INSIDE radarCanvas to enforce strict circular clipping
 local cardinalContainer = Instance.new("Frame")
 cardinalContainer.Name = "CardinalContainer"
 cardinalContainer.Size = UDim2.new(1, 0, 1, 0)
-cardinalContainer.BackgroundTransparency = 1
-cardinalContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 cardinalContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+cardinalContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+cardinalContainer.BackgroundTransparency = 1
 cardinalContainer.Parent = radarCanvas
 
 local function createCardinal(text, angle)
     local label = Instance.new("TextLabel")
     label.Text = text
     label.Size = UDim2.new(0, 24, 0, 24)
-    -- Position slightly inside the edge to ensure no clipping overflow
-    label.Position = UDim2.new(0.5 + math.sin(math.rad(angle)) * 0.45, 0, 0.5 - math.cos(math.rad(angle)) * 0.45, 0)
+    -- Position INSIDE the edge (radius < 0.5)
+    local radius = 0.42 
+    label.Position = UDim2.new(0.5 + math.sin(math.rad(angle)) * radius, 0, 0.5 - math.cos(math.rad(angle)) * radius, 0)
     label.AnchorPoint = Vector2.new(0.5, 0.5)
     label.BackgroundTransparency = 1
     label.TextColor3 = (text == "N") and Color3.new(1, 0.2, 0.2) or Color3.new(1, 1, 1)
-    label.TextSize = 20
+    label.TextStrokeTransparency = 0.8
+    label.TextSize = 18 -- Slightly smaller for fitting inside
     label.Font = Enum.Font.SourceSansBold
-    label.ZIndex = 5
+    label.ZIndex = 15
     label.Parent = cardinalContainer
     return label
 end
@@ -222,7 +202,7 @@ RunService.RenderStepped:Connect(function(dt)
     if diff > 180 then diff -= 360 elseif diff < -180 then diff += 360 end
     currentRotation = currentRotation + diff * math.min(dt * LERP_SPEED, 1)
     
-    gridContainer.Rotation = currentRotation
+
     objectContainer.Rotation = currentRotation
     cardinalContainer.Rotation = currentRotation
     
